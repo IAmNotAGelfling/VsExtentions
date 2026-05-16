@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using FilePathOnDocument.Core;
 using FilePathOnDocument.Options;
+using FilePathOnDocument.Utilities;
 using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
@@ -141,20 +142,8 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
     private bool IsInternalPath(string? filePath)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-            return true;
-
-        string tempPath = System.IO.Path.GetTempPath();
         InternalPathsOptions internalOptions = InternalPathsOptions.Instance;
-
-        foreach (string internalFile in internalOptions.GetPaths())
-        {
-            string fullPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(tempPath, internalFile));
-            if (filePath.IndexOf(fullPath, StringComparison.OrdinalIgnoreCase) >= 0)
-                return true;
-        }
-
-        return false;
+        return InternalPathDetector.IsInternalPath(filePath, internalOptions.GetPaths());
     }
 
     private string FormatPath(string? fullPath)
@@ -167,73 +156,22 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         if (IsInternalPath(fullPath) &&
             options.ShowInternalFilePaths == ShowInternalFilePathsOption.ShowFileName)
         {
-            return GetPath(fullPath, options.DirectorySeparator,
+            return PathFormatter.GetPath(fullPath, options.DirectorySeparator,
                 PathDisplayOption.TrailingPath, 1, options.SpaceAround);
         }
 
-        return GetPath(fullPath, options.DirectorySeparator,
+        return PathFormatter.GetPath(fullPath, options.DirectorySeparator,
             options.PathDisplay, options.TrailingPathLevel, options.SpaceAround);
-    }
-
-    private static string GetPath(string fullPath, DirectorySeparatorOption separator,
-        PathDisplayOption pathOption, int trailingLevel, bool addSpaceAround)
-    {
-        if (string.IsNullOrEmpty(fullPath))
-            return string.Empty;
-
-        string path = pathOption == PathDisplayOption.TrailingPath
-            ? GetTrailingPath(fullPath, trailingLevel)
-            : fullPath;
-
-        if (separator == DirectorySeparatorOption.Default)
-            return path;
-
-        string separatorChar = GetSeparatorString(separator);
-        string replacement = addSpaceAround ? $" {separatorChar} " : separatorChar;
-
-        return path.Replace(System.IO.Path.DirectorySeparatorChar.ToString(), replacement);
-    }
-
-    private static string GetSeparatorString(DirectorySeparatorOption option)
-    {
-        return option switch
-        {
-            DirectorySeparatorOption.Backslash => "\\",
-            DirectorySeparatorOption.Slash => "/",
-            DirectorySeparatorOption.GreaterThan => ">",
-            DirectorySeparatorOption.LessThan => "<",
-            DirectorySeparatorOption.Hyphen => "-",
-            DirectorySeparatorOption.Colon => ":",
-            _ => System.IO.Path.DirectorySeparatorChar.ToString()
-        };
-    }
-
-    private static string GetTrailingPath(string fullPath, int segments)
-    {
-        string[] parts = fullPath.Split(new[]
-        {
-            System.IO.Path.DirectorySeparatorChar,
-            System.IO.Path.AltDirectorySeparatorChar
-        }, StringSplitOptions.RemoveEmptyEntries);
-
-        if (parts.Length <= segments)
-            return fullPath;
-
-        return System.IO.Path.Combine(parts.Skip(parts.Length - segments).ToArray());
     }
 
     private static string TrimPathFromStart(string path, int maxLength)
     {
-        if (string.IsNullOrEmpty(path) || path.Length <= maxLength)
-            return path;
-
-        return "…" + path.Substring(path.Length - (maxLength - 1));
+        return PathFormatter.TrimPathFromStart(path, maxLength);
     }
 
     private int CalculateMaxCharacters(double maxWidth)
     {
-        double charWidth = 8.0;
-        return Math.Max(20, Math.Min((int)((maxWidth - 20) / charWidth), 100));
+        return PathFormatter.CalculateMaxCharacters(maxWidth);
     }
 
     private void UpdateBottomControlSize()
@@ -350,17 +288,13 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
         try
         {
-            string? projectDir = FindProjectDirectory(fullPath);
-            if (!string.IsNullOrEmpty(projectDir) && fullPath.StartsWith(projectDir, StringComparison.OrdinalIgnoreCase))
-            {
-                return fullPath.Substring(projectDir.Length).TrimStart('\\', '/');
-            }
+            string? projectDir = PathResolver.FindProjectDirectory(fullPath);
+            return PathResolver.GetProjectRelativePath(fullPath, projectDir);
         }
         catch
         {
+            return fullPath;
         }
-
-        return fullPath;
     }
 
     private string GetSolutionRelativePath()
@@ -371,48 +305,13 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
         try
         {
-            string? solutionDir = FindSolutionDirectory(fullPath);
-            if (!string.IsNullOrEmpty(solutionDir) && fullPath.StartsWith(solutionDir, StringComparison.OrdinalIgnoreCase))
-            {
-                return fullPath.Substring(solutionDir.Length).TrimStart('\\', '/');
-            }
+            string? solutionDir = PathResolver.FindSolutionDirectory(fullPath);
+            return PathResolver.GetSolutionRelativePath(fullPath, solutionDir);
         }
         catch
         {
+            return fullPath;
         }
-
-        return fullPath;
-    }
-
-    private string? FindProjectDirectory(string filePath)
-    {
-        string? dir = System.IO.Path.GetDirectoryName(filePath);
-        while (!string.IsNullOrEmpty(dir))
-        {
-            if (System.IO.Directory.GetFiles(dir, "*.csproj").Length > 0 ||
-                System.IO.Directory.GetFiles(dir, "*.vbproj").Length > 0 ||
-                System.IO.Directory.GetFiles(dir, "*.fsproj").Length > 0)
-            {
-                return dir;
-            }
-            dir = System.IO.Path.GetDirectoryName(dir);
-        }
-        return null;
-    }
-
-    private string? FindSolutionDirectory(string filePath)
-    {
-        string? dir = System.IO.Path.GetDirectoryName(filePath);
-        while (!string.IsNullOrEmpty(dir))
-        {
-            if (System.IO.Directory.GetFiles(dir, "*.sln").Length > 0 ||
-                System.IO.Directory.GetFiles(dir, "*.slnx").Length > 0)
-            {
-                return dir;
-            }
-            dir = System.IO.Path.GetDirectoryName(dir);
-        }
-        return null;
     }
 
     private string GetNamespace()
