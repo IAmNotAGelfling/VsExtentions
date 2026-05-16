@@ -4,4 +4,7 @@
       <Deploy Solution="Debug|*" />
     </Project>
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests\FilePathOnDocument.Tests\FilePathOnDocument.Tests.csproj" />
+  </Folder>
 </Solution>
