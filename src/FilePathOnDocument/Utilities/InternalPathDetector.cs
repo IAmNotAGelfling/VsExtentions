@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace FilePathOnDocument.Utilities;
 
@@ -22,10 +23,23 @@ public static class InternalPathDetector
 
         string tempPath = Path.GetTempPath();
 
+        // After the null check above, filePath is guaranteed non-null here
         foreach (string internalFile in internalPaths)
         {
+            // Empty string matches temp root directly
+            if (string.IsNullOrEmpty(internalFile))
+            {
+                if (filePath!.IndexOf(tempPath, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+                continue;
+            }
+
+            // Skip whitespace-only entries
+            if (string.IsNullOrWhiteSpace(internalFile))
+                continue;
+
             string fullPath = Path.GetFullPath(Path.Combine(tempPath, internalFile));
-            if (filePath.IndexOf(fullPath, StringComparison.OrdinalIgnoreCase) >= 0)
+            if (filePath!.IndexOf(fullPath, StringComparison.OrdinalIgnoreCase) >= 0)
                 return true;
         }
 

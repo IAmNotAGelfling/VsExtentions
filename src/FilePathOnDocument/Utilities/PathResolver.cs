@@ -62,15 +62,7 @@ public static class PathResolver
     /// <returns>The relative path, or the original path if not within the project.</returns>
     public static string GetProjectRelativePath(string filePath, string? projectDirectory)
     {
-        if (string.IsNullOrEmpty(filePath) || string.IsNullOrEmpty(projectDirectory))
-            return filePath ?? string.Empty;
-
-        if (filePath.StartsWith(projectDirectory, System.StringComparison.OrdinalIgnoreCase))
-        {
-            return filePath.Substring(projectDirectory.Length).TrimStart('\\', '/');
-        }
-
-        return filePath;
+        return GetRelativePath(filePath, projectDirectory);
     }
 
     /// <summary>
@@ -81,12 +73,27 @@ public static class PathResolver
     /// <returns>The relative path, or the original path if not within the solution.</returns>
     public static string GetSolutionRelativePath(string filePath, string? solutionDirectory)
     {
-        if (string.IsNullOrEmpty(filePath) || string.IsNullOrEmpty(solutionDirectory))
-            return filePath ?? string.Empty;
+        return GetRelativePath(filePath, solutionDirectory);
+    }
 
-        if (filePath.StartsWith(solutionDirectory, System.StringComparison.OrdinalIgnoreCase))
+    /// <summary>
+    /// Gets a relative path by removing the base directory prefix.
+    /// </summary>
+    /// <param name="filePath">The full file path.</param>
+    /// <param name="baseDirectory">The base directory to remove.</param>
+    /// <returns>The relative path, or the original path if not within the base directory.</returns>
+    private static string GetRelativePath(string filePath, string? baseDirectory)
+    {
+        if (string.IsNullOrEmpty(filePath))
+            return string.Empty;
+
+        if (string.IsNullOrEmpty(baseDirectory))
+            return filePath;
+
+        // After checking IsNullOrEmpty above, baseDirectory is guaranteed non-null here
+        if (filePath.StartsWith(baseDirectory, System.StringComparison.OrdinalIgnoreCase))
         {
-            return filePath.Substring(solutionDirectory.Length).TrimStart('\\', '/');
+            return filePath.Substring(baseDirectory!.Length).TrimStart('\\', '/');
         }
 
         return filePath;

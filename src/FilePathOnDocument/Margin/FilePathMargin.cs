@@ -148,19 +148,20 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
     private string FormatPath(string? fullPath)
     {
-        GeneralOptions options = GeneralOptions.Instance;
-
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
+
+        // After null check, fullPath is guaranteed non-null
+        GeneralOptions options = GeneralOptions.Instance;
 
         if (IsInternalPath(fullPath) &&
             options.ShowInternalFilePaths == ShowInternalFilePathsOption.ShowFileName)
         {
-            return PathFormatter.GetPath(fullPath, options.DirectorySeparator,
+            return PathFormatter.GetPath(fullPath!, options.DirectorySeparator,
                 PathDisplayOption.TrailingPath, 1, options.SpaceAround);
         }
 
-        return PathFormatter.GetPath(fullPath, options.DirectorySeparator,
+        return PathFormatter.GetPath(fullPath!, options.DirectorySeparator,
             options.PathDisplay, options.TrailingPathLevel, options.SpaceAround);
     }
 
@@ -268,7 +269,7 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
     private string GetFileName()
     {
-        string fullPath = _documentMonitor.FileName;
+        string? fullPath = _documentMonitor.FileName;
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
 
@@ -288,12 +289,13 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
         try
         {
-            string? projectDir = PathResolver.FindProjectDirectory(fullPath);
-            return PathResolver.GetProjectRelativePath(fullPath, projectDir);
+            // After null check, fullPath is guaranteed non-null
+            string? projectDir = PathResolver.FindProjectDirectory(fullPath!);
+            return PathResolver.GetProjectRelativePath(fullPath!, projectDir);
         }
         catch
         {
-            return fullPath;
+            return fullPath!;
         }
     }
 
@@ -305,12 +307,13 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
         try
         {
-            string? solutionDir = PathResolver.FindSolutionDirectory(fullPath);
-            return PathResolver.GetSolutionRelativePath(fullPath, solutionDir);
+            // After null check, fullPath is guaranteed non-null
+            string? solutionDir = PathResolver.FindSolutionDirectory(fullPath!);
+            return PathResolver.GetSolutionRelativePath(fullPath!, solutionDir);
         }
         catch
         {
-            return fullPath;
+            return fullPath!;
         }
     }
 
