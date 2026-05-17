@@ -40,13 +40,11 @@ jobs:
       run: dotnet test ${{ env.SOLUTION_FILE }} --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
 
     - name: Publish test results
-      uses: dorny/test-reporter@v1
+      uses: EnricoMi/publish-unit-test-result-action/windows@v2
       if: always()
       with:
-        name: Test Results
-        path: '**/test-results.trx'
-        reporter: dotnet-trx
-        fail-on-error: true
+        files: '**/test-results.trx'
+        check_name: Test Results
 
     - name: Check for build warnings
       run: |
