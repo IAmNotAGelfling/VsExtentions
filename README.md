@@ -1,4 +1,4 @@
-# Visual Studio Extensions Collection
+﻿# Visual Studio Extensions Collection
 
 A collection of Visual Studio extensions built with the **Visual Studio Community Toolkit**, designed to enhance the development experience in Visual Studio 2022.
 

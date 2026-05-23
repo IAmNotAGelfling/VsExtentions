@@ -1,4 +1,4 @@
-using AwesomeAssertions;
+﻿using AwesomeAssertions;
 using FilePathOnDocument.Utilities;
 using System;
 using System.IO;

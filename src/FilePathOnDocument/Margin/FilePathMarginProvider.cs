@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FilePathOnDocument.Core;
 using FilePathOnDocument.Options;
 using Microsoft.VisualStudio.Text.Editor;

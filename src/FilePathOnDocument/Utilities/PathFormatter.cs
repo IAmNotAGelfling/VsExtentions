@@ -1,4 +1,4 @@
-using FilePathOnDocument.Core;
+﻿using FilePathOnDocument.Core;
 using System;
 using System.IO;
 using System.Linq;

@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using Community.VisualStudio.Toolkit;
 using FilePathOnDocument.Core;
 using FilePathOnDocument.Converters;

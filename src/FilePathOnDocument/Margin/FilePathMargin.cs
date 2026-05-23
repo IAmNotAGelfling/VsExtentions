@@ -1,4 +1,4 @@
-using FilePathOnDocument.Core;
+﻿using FilePathOnDocument.Core;
 using FilePathOnDocument.Options;
 using FilePathOnDocument.Utilities;
 using Microsoft.VisualStudio.PlatformUI;

@@ -1,4 +1,4 @@
-using Community.VisualStudio.Toolkit;
+﻿using Community.VisualStudio.Toolkit;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
