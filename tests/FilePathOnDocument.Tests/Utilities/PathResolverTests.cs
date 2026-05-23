@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using FilePathOnDocument.Utilities;
 using System;
 using System.IO;
-using Xunit;
 
 namespace FilePathOnDocument.Tests.Utilities;
 
@@ -201,8 +200,8 @@ public class PathResolverTests
     public void GetProjectRelativePath_OutsideProject_ReturnsFullPath()
     {
         // Arrange
-        string filePath = @"C:\Other\File.cs";
-        string projectDir = @"C:\Solution\Project";
+        const string filePath = @"C:\Other\File.cs";
+        const string projectDir = @"C:\Solution\Project";
 
         // Act
         string result = PathResolver.GetProjectRelativePath(filePath, projectDir);
@@ -215,7 +214,7 @@ public class PathResolverTests
     public void GetProjectRelativePath_NullProjectDir_ReturnsFullPath()
     {
         // Arrange
-        string filePath = @"C:\File.cs";
+        const string filePath = @"C:\File.cs";
 
         // Act
         string result = PathResolver.GetProjectRelativePath(filePath, null);
@@ -240,8 +239,8 @@ public class PathResolverTests
     public void GetSolutionRelativePath_OutsideSolution_ReturnsFullPath()
     {
         // Arrange
-        string filePath = @"C:\Other\File.cs";
-        string solutionDir = @"C:\Solution";
+        const string filePath = @"C:\Other\File.cs";
+        const string solutionDir = @"C:\Solution";
 
         // Act
         string result = PathResolver.GetSolutionRelativePath(filePath, solutionDir);
@@ -254,7 +253,7 @@ public class PathResolverTests
     public void GetSolutionRelativePath_NullSolutionDir_ReturnsFullPath()
     {
         // Arrange
-        string filePath = @"C:\File.cs";
+        const string filePath = @"C:\File.cs";
 
         // Act
         string result = PathResolver.GetSolutionRelativePath(filePath, null);
@@ -277,8 +276,8 @@ public class PathResolverTests
     public void GetProjectRelativePath_CaseInsensitive_ReturnsRelativePath()
     {
         // Arrange
-        string filePath = @"C:\Solution\PROJECT\src\Program.cs";
-        string projectDir = @"C:\solution\project";
+        const string filePath = @"C:\Solution\PROJECT\src\Program.cs";
+        const string projectDir = @"C:\solution\project";
 
         // Act
         string result = PathResolver.GetProjectRelativePath(filePath, projectDir);

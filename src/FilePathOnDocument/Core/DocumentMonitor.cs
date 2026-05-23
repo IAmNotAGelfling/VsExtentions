@@ -1,6 +1,6 @@
+using Microsoft.VisualStudio.Text;
 using System;
 using System.ComponentModel;
-using Microsoft.VisualStudio.Text;
 
 namespace FilePathOnDocument.Core;
 
@@ -47,11 +47,19 @@ internal class DocumentMonitor : INotifyPropertyChanged, IDisposable
 
     public void Dispose()
     {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
         if (_isDisposed)
             return;
 
-        if (_document != null)
-            _document.FileActionOccurred -= OnFileActionOccurred;
+        if (disposing)
+        {
+            _document?.FileActionOccurred -= OnFileActionOccurred;
+        }
 
         _isDisposed = true;
     }

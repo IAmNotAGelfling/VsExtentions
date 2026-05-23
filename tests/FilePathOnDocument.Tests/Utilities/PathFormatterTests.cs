@@ -1,7 +1,6 @@
 using AwesomeAssertions;
 using FilePathOnDocument.Core;
 using FilePathOnDocument.Utilities;
-using Xunit;
 
 namespace FilePathOnDocument.Tests.Utilities;
 
@@ -21,7 +20,7 @@ public class PathFormatterTests
     }
 
     [Theory]
-    [InlineData(@"C:\Projects\MyApp\src\Program.cs", 1, @"Program.cs")]
+    [InlineData(@"C:\Projects\MyApp\src\Program.cs", 1, "Program.cs")]
     [InlineData(@"C:\Projects\MyApp\src\Program.cs", 2, @"src\Program.cs")]
     [InlineData(@"C:\Projects\MyApp\src\Program.cs", 3, @"MyApp\src\Program.cs")]
     [InlineData(@"C:\Projects\MyApp\src\Program.cs", 10, @"C:\Projects\MyApp\src\Program.cs")]  // More than available
@@ -83,9 +82,9 @@ public class PathFormatterTests
     }
 
     [Theory]
-    [InlineData(@"C:\Projects\MyApp\src\Program.cs", DirectorySeparatorOption.Slash, @"C:/Projects/MyApp/src/Program.cs")]
-    [InlineData(@"C:\Projects\MyApp\src\Program.cs", DirectorySeparatorOption.GreaterThan, @"C:>Projects>MyApp>src>Program.cs")]
-    [InlineData(@"C:\Projects\MyApp\src\Program.cs", DirectorySeparatorOption.Hyphen, @"C:-Projects-MyApp-src-Program.cs")]
+    [InlineData(@"C:\Projects\MyApp\src\Program.cs", DirectorySeparatorOption.Slash, "C:/Projects/MyApp/src/Program.cs")]
+    [InlineData(@"C:\Projects\MyApp\src\Program.cs", DirectorySeparatorOption.GreaterThan, "C:>Projects>MyApp>src>Program.cs")]
+    [InlineData(@"C:\Projects\MyApp\src\Program.cs", DirectorySeparatorOption.Hyphen, "C:-Projects-MyApp-src-Program.cs")]
     public void GetPath_CustomSeparator_ReplacesSeparator(string input, DirectorySeparatorOption separator, string expected)
     {
         // Arrange & Act
@@ -99,26 +98,26 @@ public class PathFormatterTests
     public void GetPath_CustomSeparatorWithSpaces_AddsSpacesAroundSeparator()
     {
         // Arrange
-        string input = @"C:\Projects\MyApp\src\Program.cs";
+        const string input = @"C:\Projects\MyApp\src\Program.cs";
 
         // Act
         string result = PathFormatter.GetPath(input, DirectorySeparatorOption.GreaterThan, PathDisplayOption.Absolute, 2, true);
 
         // Assert
-        result.Should().Be(@"C: > Projects > MyApp > src > Program.cs");
+        result.Should().Be("C: > Projects > MyApp > src > Program.cs");
     }
 
     [Fact]
     public void GetPath_TrailingPathWithCustomSeparator_CombinesBothOptions()
     {
         // Arrange
-        string input = @"C:\Projects\MyApp\src\Program.cs";
+        const string input = @"C:\Projects\MyApp\src\Program.cs";
 
         // Act
         string result = PathFormatter.GetPath(input, DirectorySeparatorOption.Slash, PathDisplayOption.TrailingPath, 2, false);
 
         // Assert
-        result.Should().Be(@"src/Program.cs");
+        result.Should().Be("src/Program.cs");
     }
 
     [Theory]
@@ -170,8 +169,8 @@ public class PathFormatterTests
     }
 
     [Theory]
-    [InlineData(@"C:\Folder1\Folder2\File.txt", DirectorySeparatorOption.Colon, PathDisplayOption.TrailingPath, 2, true, @"Folder2 : File.txt")]
-    [InlineData(@"D:\A\B\C\D\E\F.cs", DirectorySeparatorOption.GreaterThan, PathDisplayOption.TrailingPath, 3, false, @"D>E>F.cs")]
+    [InlineData(@"C:\Folder1\Folder2\File.txt", DirectorySeparatorOption.Colon, PathDisplayOption.TrailingPath, 2, true, "Folder2 : File.txt")]
+    [InlineData(@"D:\A\B\C\D\E\F.cs", DirectorySeparatorOption.GreaterThan, PathDisplayOption.TrailingPath, 3, false, "D>E>F.cs")]
     public void GetPath_ComplexScenarios_ProducesExpectedOutput(string input, DirectorySeparatorOption separator, PathDisplayOption pathOption, int trailingLevel, bool spaceAround, string expected)
     {
         // Arrange & Act

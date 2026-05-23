@@ -1,53 +1,84 @@
-using System;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using System.Linq;
 using System.Reflection;
 
 namespace FilePathOnDocument.Converters;
 
 internal class DisplayNameEnumConverter : EnumConverter
 {
-    private readonly Type _enumType;
+    private static readonly ConcurrentDictionary<Type, Cache> _cache = new();
+
+    private readonly Cache _map;
 
     public DisplayNameEnumConverter(Type type) : base(type)
     {
-        _enumType = type;
+        _map = _cache.GetOrAdd(type, Build);
     }
 
-    public override object? ConvertTo(ITypeDescriptorContext? context, CultureInfo? culture, object? value, Type destinationType)
+    private static Cache Build(Type type)
     {
-        if (destinationType == typeof(string) && value != null)
+        var displayToValue = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        var valueToDisplay = new Dictionary<object, string>();
+
+        foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Static))
         {
-            FieldInfo? field = _enumType.GetField(value.ToString()!);
-            if (field != null)
-            {
-                DisplayAttribute? displayAttr = field.GetCustomAttribute<DisplayAttribute>();
-                if (displayAttr != null && !string.IsNullOrEmpty(displayAttr.Name))
-                {
-                    return displayAttr.Name;
-                }
-            }
+            var value = field.GetValue(null)!;
+
+            var display = field.GetCustomAttribute<DisplayAttribute>()?.Name
+                          ?? field.Name;
+
+            displayToValue[display] = value;
+            valueToDisplay[value] = display;
+        }
+
+        return new Cache(displayToValue, valueToDisplay);
+    }
+
+    public override object? ConvertTo(
+        ITypeDescriptorContext? context,
+        CultureInfo? culture,
+        object? value,
+        Type destinationType)
+    {
+        if (destinationType == typeof(string) &&
+            value != null &&
+            _map.ValueToDisplay.TryGetValue(value, out var display))
+        {
+            return display;
         }
 
         return base.ConvertTo(context, culture, value, destinationType);
     }
 
-    public override object? ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
+    public override object? ConvertFrom(
+        ITypeDescriptorContext? context,
+        CultureInfo? culture,
+        object value)
     {
-        if (value is string stringValue)
+        if (value is string s &&
+            _map.DisplayToValue.TryGetValue(s, out var enumValue))
         {
-            foreach (FieldInfo field in _enumType.GetFields(BindingFlags.Public | BindingFlags.Static))
-            {
-                DisplayAttribute? displayAttr = field.GetCustomAttribute<DisplayAttribute>();
-                if (displayAttr != null && displayAttr.Name == stringValue)
-                {
-                    return field.GetValue(null);
-                }
-            }
+            return enumValue;
         }
 
         return base.ConvertFrom(context, culture, value);
+    }
+
+    private sealed class Cache
+    {
+        public Dictionary<string, object> DisplayToValue { get; }
+        public Dictionary<object, string> ValueToDisplay { get; }
+
+        public Cache(
+            Dictionary<string, object> displayToValue,
+            Dictionary<object, string> valueToDisplay)
+        {
+            DisplayToValue = displayToValue;
+            ValueToDisplay = valueToDisplay;
+        }
     }
 }

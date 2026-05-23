@@ -67,7 +67,7 @@ public class InternalPathDetectorTests
     {
         // Arrange
         string tempPath = Path.GetTempPath();
-        string internalFolder = "MyInternalFiles";
+        const string internalFolder = "MyInternalFiles";
         string fullInternalPath = Path.Combine(tempPath, internalFolder);
         string testPath = Path.Combine(fullInternalPath, "TestFile.txt");
         string[] internalPaths = [internalFolder];
@@ -83,7 +83,7 @@ public class InternalPathDetectorTests
     public void IsInternalPath_PathNotInInternalFolders_ReturnsFalse()
     {
         // Arrange
-        string testPath = @"C:\Projects\MyApp\Program.cs";
+        const string testPath = @"C:\Projects\MyApp\Program.cs";
         string[] internalPaths = ["Temp", "TempFiles"];
 
         // Act
@@ -98,7 +98,7 @@ public class InternalPathDetectorTests
     {
         // Arrange
         string tempPath = Path.GetTempPath();
-        string internalFolder = "MyInternalFiles";
+        const string internalFolder = "MyInternalFiles";
         string fullInternalPath = Path.Combine(tempPath, internalFolder);
         string testPath = Path.Combine(fullInternalPath, "TestFile.txt").ToUpperInvariant();
         string[] internalPaths = [internalFolder.ToLowerInvariant()];
@@ -115,8 +115,8 @@ public class InternalPathDetectorTests
     {
         // Arrange
         string tempPath = Path.GetTempPath();
-        string internalFolder1 = "Internal1";
-        string internalFolder2 = "Internal2";
+        const string internalFolder1 = "Internal1";
+        const string internalFolder2 = "Internal2";
         string fullInternalPath2 = Path.Combine(tempPath, internalFolder2);
         string testPath = Path.Combine(fullInternalPath2, "TestFile.txt");
         string[] internalPaths = [internalFolder1, internalFolder2];
@@ -148,7 +148,7 @@ public class InternalPathDetectorTests
     {
         // Arrange
         string tempPath = Path.GetTempPath();
-        string internalFolder = @"Level1\Level2\Level3";
+        const string internalFolder = @"Level1\Level2\Level3";
         string fullInternalPath = Path.GetFullPath(Path.Combine(tempPath, internalFolder));
         string testPath = Path.Combine(fullInternalPath, "Deep", "File.txt");
         string[] internalPaths = [internalFolder];
@@ -164,7 +164,7 @@ public class InternalPathDetectorTests
     public void IsInternalPath_PathContainsButNotWithinInternal_ReturnsFalse()
     {
         // Arrange
-        string testPath = @"C:\MyTemp\SomeFolder\File.txt"; // Contains "Temp" but not in system temp
+        const string testPath = @"C:\MyTemp\SomeFolder\File.txt"; // Contains "Temp" but not in system temp
         string[] internalPaths = ["Temp"];
 
         // Act
@@ -179,7 +179,7 @@ public class InternalPathDetectorTests
     {
         // Arrange
         string tempPath = Path.GetTempPath();
-        string internalFolder = "TestFolder/SubFolder";
+        const string internalFolder = "TestFolder/SubFolder";
         string normalizedFolder = internalFolder.Replace('/', Path.DirectorySeparatorChar);
         string fullInternalPath = Path.GetFullPath(Path.Combine(tempPath, normalizedFolder));
         string testPath = Path.Combine(fullInternalPath, "File.txt");

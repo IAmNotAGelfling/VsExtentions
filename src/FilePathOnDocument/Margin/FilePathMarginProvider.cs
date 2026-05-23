@@ -23,7 +23,7 @@ internal abstract class FilePathMarginProvider : IWpfTextViewMarginProvider
 
         try
         {
-            FilePathMargin margin = new FilePathMargin(wpfTextViewHost.TextView, Alignment);
+            FilePathMargin margin = new(wpfTextViewHost.TextView, Alignment);
 
             GeneralOptions.Saved += _ => margin.RefreshFromSettings();
             InternalPathsOptions.Saved += _ => margin.RefreshFromSettings();

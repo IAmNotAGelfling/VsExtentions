@@ -1,7 +1,7 @@
+using FilePathOnDocument.Core;
 using System;
 using System.IO;
 using System.Linq;
-using FilePathOnDocument.Core;
 
 namespace FilePathOnDocument.Utilities;
 
@@ -68,11 +68,11 @@ public static class PathFormatter
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
 
-        string[] parts = fullPath.Split(new[]
-        {
+        string[] parts = fullPath.Split(
+        [
             Path.DirectorySeparatorChar,
             Path.AltDirectorySeparatorChar
-        }, StringSplitOptions.RemoveEmptyEntries);
+        ], StringSplitOptions.RemoveEmptyEntries);
 
         // If the path has fewer or equal segments than requested, return as-is
         if (parts.Length <= segments)
@@ -87,7 +87,7 @@ public static class PathFormatter
             return fullPath;
 
         // Otherwise take the requested number of trailing segments
-        string[] trailing = parts.Skip(parts.Length - segments).ToArray();
+        string[] trailing = [.. parts.Skip(parts.Length - segments)];
         return Path.Combine(trailing);
     }
 

@@ -1,16 +1,15 @@
-using System;
-using System.ComponentModel;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
 using FilePathOnDocument.Core;
 using FilePathOnDocument.Options;
 using FilePathOnDocument.Utilities;
 using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
 
 namespace FilePathOnDocument.Margin;
 
@@ -18,12 +17,19 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 {
     public const string MarginName = "FilePathOnFooter";
 
-    private static readonly Regex CSharpNamespaceRegex = new Regex(@"namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline);
-    private static readonly Regex VbNamespaceRegex = new Regex(@"Namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+    private static readonly Regex CSharpNamespaceRegex = new(@"namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline);
+    private static readonly Regex VbNamespaceRegex = new(@"Namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+    private static readonly Dictionary<string, Regex> NamespaceExtractors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { ".cs", CSharpNamespaceRegex },
+        { ".fs", CSharpNamespaceRegex },
+        { ".vb", VbNamespaceRegex }
+    };
 
     private readonly IWpfTextView _textView;
     private readonly DocumentMonitor _documentMonitor;
-    private readonly TextBox _lblFilePath = null!;
+    private readonly TextBlock _lblFilePath = null!;
     private readonly AlignmentOption _alignment;
     private bool _isDisposed;
 
@@ -35,28 +41,27 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         _documentMonitor = new DocumentMonitor(GetDocument());
         if (string.IsNullOrWhiteSpace(_documentMonitor.FileName) ||
             _documentMonitor.FileName == "Temp.txt")
+        {
             return;
+        }
 
         _documentMonitor.PropertyChanged += OnDocumentFileNameChanged;
         Loaded += OnLoaded;
         ClipToBounds = true;
 
-        _lblFilePath = new TextBox
+        _lblFilePath = new TextBlock
         {
-            IsReadOnly = true,
-            BorderThickness = new Thickness(0),
             Padding = _alignment == AlignmentOption.BottomControl
                 ? new Thickness(0, 0, 10, 0)
-                : new Thickness(0)
+                : new Thickness(0),
+            ContextMenu = CreateContextMenu()
         };
-
-        _lblFilePath.ContextMenu = CreateContextMenu();
 
         Children.Add(_lblFilePath);
 
         SetResourceReference(BackgroundProperty, EnvironmentColors.ScrollBarBackgroundBrushKey);
-        _lblFilePath.SetResourceReference(TextBox.ForegroundProperty, EnvironmentColors.ComboBoxTextBrushKey);
-        _lblFilePath.SetResourceReference(TextBox.BackgroundProperty, EnvironmentColors.ScrollBarBackgroundBrushKey);
+        _lblFilePath.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ComboBoxTextBrushKey);
+        _lblFilePath.SetResourceReference(TextBlock.BackgroundProperty, EnvironmentColors.ScrollBarBackgroundBrushKey);
 
         UpdateDisplay(_documentMonitor.FileName);
     }
@@ -93,7 +98,6 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         }
 
         _lblFilePath.SizeChanged += (s, ev) => Height = _lblFilePath.ActualHeight;
-        _lblFilePath.PreviewMouseDown += OnMouseDown;
 
         Loaded -= OnLoaded;
     }
@@ -127,7 +131,7 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
                   "(Configure via Tools → Options → File Path On Document)";
     }
 
-    private bool ShouldHideInternalPath(string? filePath)
+    private static bool ShouldHideInternalPath(string? filePath)
     {
         GeneralOptions options = GeneralOptions.Instance;
 
@@ -140,13 +144,13 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         return options.ShowInternalFilePaths == ShowInternalFilePathsOption.Hide;
     }
 
-    private bool IsInternalPath(string? filePath)
+    private static bool IsInternalPath(string? filePath)
     {
         InternalPathsOptions internalOptions = InternalPathsOptions.Instance;
         return InternalPathDetector.IsInternalPath(filePath, internalOptions.GetPaths());
     }
 
-    private string FormatPath(string? fullPath)
+    private static string FormatPath(string? fullPath)
     {
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
@@ -170,7 +174,7 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         return PathFormatter.TrimPathFromStart(path, maxLength);
     }
 
-    private int CalculateMaxCharacters(double maxWidth)
+    private static int CalculateMaxCharacters(double maxWidth)
     {
         return PathFormatter.CalculateMaxCharacters(maxWidth);
     }
@@ -184,28 +188,6 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         Height = _lblFilePath.DesiredSize.Height;
     }
 
-    private void OnMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.ChangedButton == MouseButton.Right)
-            HandleRightClick(e.ClickCount);
-        else
-            HandleLeftClick(e.ClickCount);
-    }
-
-    private void HandleRightClick(int clickCount)
-    {
-        // Context menu handles all right-click functionality
-    }
-
-    private void HandleLeftClick(int clickCount)
-    {
-        if (clickCount >= 3)
-        {
-            _lblFilePath.SelectAll();
-        }
-    }
-
-
     private void OpenContainingFolder()
     {
         try
@@ -214,48 +196,49 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         }
         catch
         {
+            // Silent failure - don't crash VS if explorer.exe fails or file doesn't exist
         }
     }
 
     private ContextMenu CreateContextMenu()
     {
-        ContextMenu menu = new ContextMenu();
+        ContextMenu menu = new();
 
-        MenuItem copyFileName = new MenuItem { Header = "Copy File Name" };
-        copyFileName.Click += (s, e) => CopyToClipboard(GetFileName());
-
-        MenuItem copyFullPath = new MenuItem { Header = "Copy Full Path" };
+        MenuItem copyFullPath = new() { Header = "Copy Full Path" };
         copyFullPath.Click += (s, e) => CopyToClipboard(GetFullPath());
 
-        MenuItem copyProjectRelative = new MenuItem { Header = "Copy Project Relative Path" };
+        MenuItem copyFileName = new() { Header = "Copy File Name" };
+        copyFileName.Click += (s, e) => CopyToClipboard(GetFileName());
+
+        MenuItem copyProjectRelative = new() { Header = "Copy Project Relative Path" };
         copyProjectRelative.Click += (s, e) => CopyToClipboard(GetProjectRelativePath());
 
-        MenuItem copySolutionRelative = new MenuItem { Header = "Copy Solution Relative Path" };
+        MenuItem copySolutionRelative = new() { Header = "Copy Solution Relative Path" };
         copySolutionRelative.Click += (s, e) => CopyToClipboard(GetSolutionRelativePath());
 
-        menu.Items.Add(copyFileName);
         menu.Items.Add(copyFullPath);
+        menu.Items.Add(copyFileName);
         menu.Items.Add(copyProjectRelative);
         menu.Items.Add(copySolutionRelative);
 
-        string? ext = System.IO.Path.GetExtension(_documentMonitor.FileName)?.ToLower();
-        if (ext == ".cs" || ext == ".vb" || ext == ".fs")
+        string? ext = System.IO.Path.GetExtension(_documentMonitor.FileName);
+        if (!string.IsNullOrEmpty(ext) && NamespaceExtractors.ContainsKey(ext))
         {
-            MenuItem copyNamespace = new MenuItem { Header = "Copy Namespace" };
+            MenuItem copyNamespace = new() { Header = "Copy Namespace" };
             copyNamespace.Click += (s, e) => CopyToClipboard(GetNamespace());
             menu.Items.Add(copyNamespace);
         }
 
         menu.Items.Add(new Separator());
 
-        MenuItem openFolder = new MenuItem { Header = "Open Containing Folder" };
+        MenuItem openFolder = new() { Header = "Open Containing Folder" };
         openFolder.Click += (s, e) => OpenContainingFolder();
         menu.Items.Add(openFolder);
 
         return menu;
     }
 
-    private void CopyToClipboard(string text)
+    private static void CopyToClipboard(string text)
     {
         try
         {
@@ -264,6 +247,7 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         }
         catch
         {
+            // Silent failure - don't crash VS if namespace extraction fails
         }
     }
 
@@ -321,30 +305,20 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
     {
         try
         {
-            string? ext = System.IO.Path.GetExtension(_documentMonitor.FileName)?.ToLower();
-            if (ext != ".cs" && ext != ".vb" && ext != ".fs")
+            string? ext = System.IO.Path.GetExtension(_documentMonitor.FileName);
+            if (string.IsNullOrEmpty(ext) || !NamespaceExtractors.TryGetValue(ext, out Regex? regex))
                 return string.Empty;
 
             ITextSnapshot snapshot = _textView.TextSnapshot;
             string text = snapshot.GetText();
 
-            Match match;
-
-            if (ext == ".cs" || ext == ".fs")
-            {
-                match = CSharpNamespaceRegex.Match(text);
-                if (match.Success)
-                    return match.Groups[1].Value;
-            }
-            else if (ext == ".vb")
-            {
-                match = VbNamespaceRegex.Match(text);
-                if (match.Success)
-                    return match.Groups[1].Value;
-            }
+            Match match = regex.Match(text);
+            if (match.Success)
+                return match.Groups[1].Value;
         }
         catch
         {
+            // Silent failure - don't crash VS if namespace extraction fails
         }
 
         return string.Empty;
@@ -392,13 +366,20 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
     public void Dispose()
     {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
         if (_isDisposed)
             return;
 
-        if (_documentMonitor != null)
-            _documentMonitor.PropertyChanged -= OnDocumentFileNameChanged;
+        if (disposing)
+        {
+            _documentMonitor?.PropertyChanged -= OnDocumentFileNameChanged;
+        }
 
-        GC.SuppressFinalize(this);
         _isDisposed = true;
     }
 

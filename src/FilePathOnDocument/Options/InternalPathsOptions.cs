@@ -1,8 +1,8 @@
+using Community.VisualStudio.Toolkit;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using Community.VisualStudio.Toolkit;
 
 namespace FilePathOnDocument.Options;
 
@@ -17,10 +17,10 @@ internal class InternalPathsOptions : BaseOptionModel<InternalPathsOptions>
     public IEnumerable<string> GetPaths()
     {
         if (string.IsNullOrWhiteSpace(InternalPaths))
-            return Enumerable.Empty<string>();
+            return [];
 
         return InternalPaths
-            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
             .Select(p => p.Trim())
             .Where(p => !string.IsNullOrWhiteSpace(p));
     }
