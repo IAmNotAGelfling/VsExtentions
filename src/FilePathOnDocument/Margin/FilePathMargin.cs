@@ -5,9 +5,7 @@ using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -17,17 +15,6 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 {
     public const string MarginName = "FilePathOnFooter";
 
-    private static readonly Regex CSharpNamespaceRegex = new(@"namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline);
-    private static readonly Regex VbNamespaceRegex = new(@"Namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
-
-    private static readonly Dictionary<string, Regex> NamespaceExtractors = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { ".cs", CSharpNamespaceRegex },
-        { ".fs", CSharpNamespaceRegex },
-        { ".vb", VbNamespaceRegex }
-    };
-
-    private readonly IWpfTextView _textView;
     private readonly DocumentMonitor _documentMonitor;
     private readonly TextBlock _lblFilePath = null!;
     private readonly AlignmentOption _alignment;
@@ -35,10 +22,10 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
     public FilePathMargin(IWpfTextView textView, AlignmentOption alignment)
     {
-        _textView = textView ?? throw new ArgumentNullException(nameof(textView));
+        if (textView == null) throw new ArgumentNullException(nameof(textView));
         _alignment = alignment;
 
-        _documentMonitor = new DocumentMonitor(GetDocument());
+        _documentMonitor = new DocumentMonitor(GetDocument(textView));
         if (string.IsNullOrWhiteSpace(_documentMonitor.FileName) ||
             _documentMonitor.FileName == "Temp.txt")
         {
@@ -66,9 +53,9 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         UpdateDisplay(_documentMonitor.FileName);
     }
 
-    private ITextDocument? GetDocument()
+    private static ITextDocument? GetDocument(IWpfTextView textView)
     {
-        _textView.TextDataModel.DocumentBuffer.Properties
+        textView.TextDataModel.DocumentBuffer.Properties
             .TryGetProperty<ITextDocument>(typeof(ITextDocument), out ITextDocument? document);
         return document;
     }
@@ -221,11 +208,10 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         menu.Items.Add(copyProjectRelative);
         menu.Items.Add(copySolutionRelative);
 
-        string? ext = System.IO.Path.GetExtension(_documentMonitor.FileName);
-        if (!string.IsNullOrEmpty(ext) && NamespaceExtractors.ContainsKey(ext))
+        if (_documentMonitor.Namespace != null)
         {
             MenuItem copyNamespace = new() { Header = "Copy Namespace" };
-            copyNamespace.Click += (s, e) => CopyToClipboard(GetNamespace());
+            copyNamespace.Click += (s, e) => CopyToClipboard(_documentMonitor.Namespace ?? string.Empty);
             menu.Items.Add(copyNamespace);
         }
 
@@ -271,16 +257,7 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
 
-        try
-        {
-            // After null check, fullPath is guaranteed non-null
-            string? projectDir = PathResolver.FindProjectDirectory(fullPath!);
-            return PathResolver.GetProjectRelativePath(fullPath!, projectDir);
-        }
-        catch
-        {
-            return fullPath!;
-        }
+        return MakeRelative(fullPath!, _documentMonitor.ProjectDir) ?? fullPath!;
     }
 
     private string GetSolutionRelativePath()
@@ -289,40 +266,20 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
 
-        try
-        {
-            // After null check, fullPath is guaranteed non-null
-            string? solutionDir = PathResolver.FindSolutionDirectory(fullPath!);
-            return PathResolver.GetSolutionRelativePath(fullPath!, solutionDir);
-        }
-        catch
-        {
-            return fullPath!;
-        }
+        return MakeRelative(fullPath!, _documentMonitor.SolutionDir) ?? fullPath!;
     }
 
-    private string GetNamespace()
+    private static string? MakeRelative(string fullPath, string? baseDir)
     {
-        try
-        {
-            string? ext = System.IO.Path.GetExtension(_documentMonitor.FileName);
-            if (string.IsNullOrEmpty(ext) || !NamespaceExtractors.TryGetValue(ext, out Regex? regex))
-                return string.Empty;
+        if (string.IsNullOrEmpty(baseDir))
+            return null;
 
-            ITextSnapshot snapshot = _textView.TextSnapshot;
-            string text = snapshot.GetText();
+        if (fullPath.StartsWith(baseDir!, StringComparison.OrdinalIgnoreCase))
+            return fullPath.Substring(baseDir!.Length).TrimStart('\\', '/');
 
-            Match match = regex.Match(text);
-            if (match.Success)
-                return match.Groups[1].Value;
-        }
-        catch
-        {
-            // Silent failure - don't crash VS if namespace extraction fails
-        }
-
-        return string.Empty;
+        return null;
     }
+
 
     public FrameworkElement VisualElement
     {
