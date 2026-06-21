@@ -1,44 +1,130 @@
-﻿using Microsoft.VisualStudio.Text;
+using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.Text;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
+using System.Text.RegularExpressions;
 
 namespace FilePathOnDocument.Core;
 
 internal class DocumentMonitor : INotifyPropertyChanged, IDisposable
 {
+    private static readonly Regex CSharpNamespaceRegex = new(@"namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline);
+    private static readonly Regex VbNamespaceRegex = new(@"Namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+    private static readonly Dictionary<string, Regex> NamespaceExtractors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { ".cs", CSharpNamespaceRegex },
+        { ".fs", CSharpNamespaceRegex },
+        { ".vb", VbNamespaceRegex }
+    };
+
     private string? _fileName;
     private bool _isDisposed;
     private readonly ITextDocument? _document;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    public string? ProjectDir { get; private set; }
+    public string? ProjectName { get; private set; }
+    public string? SolutionDir { get; private set; }
+    public string? SolutionName { get; private set; }
+    public string? Namespace { get; private set; }
+
     public DocumentMonitor(ITextDocument? document)
     {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
         if (document == null)
             return;
 
         _document = document;
-        FileName = _document.FilePath;
+        SetFileName(_document.FilePath);
         _document.FileActionOccurred += OnFileActionOccurred;
     }
 
     private void OnFileActionOccurred(object sender, TextDocumentFileActionEventArgs e)
     {
-        FileName = e.FilePath;
+        ThreadHelper.ThrowIfNotOnUIThread();
+        SetFileName(e.FilePath);
     }
 
-    public string? FileName
+    private void SetFileName(string? filePath)
     {
-        get => _fileName;
-        private set
-        {
-            if (_fileName == value)
-                return;
+        ThreadHelper.ThrowIfNotOnUIThread();
 
-            _fileName = value;
-            OnPropertyChanged(nameof(FileName));
+        if (_fileName == filePath)
+            return;
+
+        _fileName = filePath;
+        ResolveProjectAndSolution(filePath);
+        ExtractNamespace(filePath);
+        OnPropertyChanged(nameof(FileName));
+    }
+
+    private void ResolveProjectAndSolution(string? filePath)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        ProjectDir = null;
+        ProjectName = null;
+        SolutionDir = null;
+        SolutionName = null;
+
+        if (string.IsNullOrEmpty(filePath))
+            return;
+
+        if (Package.GetGlobalService(typeof(SVsRunningDocumentTable)) is IVsRunningDocumentTable rdt)
+        {
+            rdt.FindAndLockDocument(0, filePath, out IVsHierarchy? hier, out _, out _, out uint cookie);
+            if (cookie != 0)
+                rdt.UnlockDocument(0, cookie);
+
+            if (hier != null)
+            {
+                hier.GetProperty(VSConstants.VSITEMID_ROOT, (int)__VSHPROPID.VSHPROPID_ProjectDir, out object projDirObj);
+                hier.GetProperty(VSConstants.VSITEMID_ROOT, (int)__VSHPROPID.VSHPROPID_ProjectName, out object projNameObj);
+                ProjectDir = projDirObj as string;
+                ProjectName = projNameObj as string;
+            }
+        }
+
+        if (Package.GetGlobalService(typeof(SVsSolution)) is IVsSolution solution)
+        {
+            solution.GetSolutionInfo(out string? slnDir, out string? slnName, out _);
+            SolutionDir = slnDir;
+            SolutionName = slnName;
         }
     }
+
+    private void ExtractNamespace(string? filePath)
+    {
+        Namespace = null;
+
+        if (string.IsNullOrEmpty(filePath))
+            return;
+
+        string? ext = Path.GetExtension(filePath);
+        if (string.IsNullOrEmpty(ext) || !NamespaceExtractors.TryGetValue(ext, out Regex? regex))
+            return;
+
+        try
+        {
+            string text = _document!.TextBuffer.CurrentSnapshot.GetText();
+            Match match = regex.Match(text);
+            if (match.Success)
+                Namespace = match.Groups[1].Value;
+        }
+        catch
+        {
+            // Silent failure
+        }
+    }
+
+    public string? FileName => _fileName;
 
     protected virtual void OnPropertyChanged(string propertyName)
     {
