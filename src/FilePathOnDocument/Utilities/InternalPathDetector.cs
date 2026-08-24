@@ -21,15 +21,16 @@ public static class InternalPathDetector
         if (string.IsNullOrWhiteSpace(filePath))
             return true;
 
+        string candidatePath = filePath!;
+
         string tempPath = Path.GetTempPath();
 
-        // After the null check above, filePath is guaranteed non-null here
         foreach (string internalFile in internalPaths)
         {
             // Empty string matches temp root directly
             if (string.IsNullOrEmpty(internalFile))
             {
-                if (filePath!.IndexOf(tempPath, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (candidatePath.IndexOf(tempPath, StringComparison.OrdinalIgnoreCase) >= 0)
                     return true;
                 continue;
             }
@@ -39,7 +40,7 @@ public static class InternalPathDetector
                 continue;
 
             string fullPath = Path.GetFullPath(Path.Combine(tempPath, internalFile));
-            if (filePath!.IndexOf(fullPath, StringComparison.OrdinalIgnoreCase) >= 0)
+            if (candidatePath.IndexOf(fullPath, StringComparison.OrdinalIgnoreCase) >= 0)
                 return true;
         }
 

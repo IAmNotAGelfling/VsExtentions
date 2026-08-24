@@ -15,7 +15,7 @@ jobs:
       pull-requests: write
 
     env:
-      SOLUTION_FILE: FilePathOnDocument.slnx
+      SOLUTION_FILE: VsExtensions.slnx
       CONFIGURATION: Release
 
     steps:

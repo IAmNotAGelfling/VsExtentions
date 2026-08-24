@@ -13,10 +13,10 @@
     <ProjectCapability Include="CreateVsixContainer" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Community.VisualStudio.Toolkit.17" Version="17.0.492" />
+    <PackageReference Include="Community.VisualStudio.Toolkit.17" Version="17.0.551" />
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="18.5.40034" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="PresentationCore" />
@@ -30,4 +30,31 @@
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
   </ItemGroup>
+
+  <Target Name="IncrementBuildNumber" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildNumberFile>$(MSBuildProjectDirectory)\.buildnumber</BuildNumberFile>
+    </PropertyGroup>
+    <ReadLinesFromFile File="$(BuildNumberFile)" Condition="Exists('$(BuildNumberFile)')">
+      <Output TaskParameter="Lines" PropertyName="CurrentBuildNumber" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <CurrentBuildNumber Condition="'$(CurrentBuildNumber)' == ''">0</CurrentBuildNumber>
+      <NextBuildNumber>$([MSBuild]::Add($(CurrentBuildNumber), 1))</NextBuildNumber>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(BuildNumberFile)" Lines="$(NextBuildNumber)" Overwrite="true" />
+    <!-- Read current version from manifest, replace 3-part with 4-part including build number -->
+    <XmlPeek XmlInputPath="$(MSBuildProjectDirectory)\source.extension.vsixmanifest" Query="/x:PackageManifest/x:Metadata/x:Identity/@Version" Namespaces="&lt;Namespace Prefix='x' Uri='http://schemas.microsoft.com/developer/vsx-schema/2011'/&gt;">
+      <Output TaskParameter="Result" PropertyName="CurrentVsixVersion" />
+    </XmlPeek>
+    <PropertyGroup>
+      <!-- If 4-part (x.x.x.x), strip last component to get base; if 3-part (x.x.x), use as-is -->
+      <VsixVersionBase Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(CurrentVsixVersion)', '^\d+\.\d+\.\d+\.\d+$'))">$([System.Text.RegularExpressions.Regex]::Replace('$(CurrentVsixVersion)', '\.\d+$', ''))</VsixVersionBase>
+      <VsixVersionBase Condition="'$(VsixVersionBase)' == ''">$(CurrentVsixVersion)</VsixVersionBase>
+      <NewVsixVersion>$(VsixVersionBase).$(NextBuildNumber)</NewVsixVersion>
+    </PropertyGroup>
+    <XmlPoke XmlInputPath="$(MSBuildProjectDirectory)\source.extension.vsixmanifest" Query="/x:PackageManifest/x:Metadata/x:Identity/@Version" Value="$(NewVsixVersion)" Namespaces="&lt;Namespace Prefix='x' Uri='http://schemas.microsoft.com/developer/vsx-schema/2011'/&gt;" />
+    <Message Text="VSIX version updated to $(NewVsixVersion)" Importance="high" />
+  </Target>
+
 </Project>

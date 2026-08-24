@@ -14,5 +14,4 @@ namespace FilePathOnDocument.Margin;
 internal sealed class FilePathMarginTopProvider : FilePathMarginProvider
 {
     protected override AlignmentOption Alignment => AlignmentOption.Top;
-    protected override string MarginName => FilePathMargin.MarginName + "Top";
 }
