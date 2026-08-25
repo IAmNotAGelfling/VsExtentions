@@ -26,6 +26,14 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         _alignment = alignment;
 
         _documentMonitor = new DocumentMonitor(GetDocument(textView));
+        _lblFilePath = new TextBlock
+        {
+            Padding = _alignment == AlignmentOption.BottomControl
+                ? new Thickness(0, 0, 10, 0)
+                : new Thickness(0),
+            ContextMenu = CreateContextMenu()
+        };
+
         if (string.IsNullOrWhiteSpace(_documentMonitor.FileName) ||
             _documentMonitor.FileName == "Temp.txt")
         {
@@ -35,14 +43,6 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         _documentMonitor.PropertyChanged += OnDocumentFileNameChanged;
         Loaded += OnLoaded;
         ClipToBounds = true;
-
-        _lblFilePath = new TextBlock
-        {
-            Padding = _alignment == AlignmentOption.BottomControl
-                ? new Thickness(0, 0, 10, 0)
-                : new Thickness(0),
-            ContextMenu = CreateContextMenu()
-        };
 
         Children.Add(_lblFilePath);
 
@@ -84,9 +84,14 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
             Height = _lblFilePath.ActualHeight;
         }
 
-        _lblFilePath.SizeChanged += (s, ev) => Height = _lblFilePath.ActualHeight;
+        _lblFilePath.SizeChanged += OnLabelSizeChanged;
 
         Loaded -= OnLoaded;
+    }
+
+    private void OnLabelSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        Height = _lblFilePath.ActualHeight;
     }
 
     private void UpdateDisplay(string? filePath)
@@ -104,8 +109,8 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
         if (_alignment == AlignmentOption.BottomControl)
         {
-            int maxChars = CalculateMaxCharacters(400);
-            _lblFilePath.Text = TrimPathFromStart(displayPath, maxChars);
+            int maxChars = PathFormatter.CalculateMaxCharacters(400);
+            _lblFilePath.Text = PathFormatter.TrimPathFromStart(displayPath, maxChars);
             UpdateBottomControlSize();
         }
         else
@@ -114,7 +119,7 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         }
 
         ToolTip = $"{filePath}{Environment.NewLine}" +
-                  "Right-click for copy options and to open containing folder{Environment.NewLine}" +
+                  $"Right-click for copy options and to open containing folder{Environment.NewLine}" +
                   "(Configure via Tools → Options → File Path On Document)";
     }
 
@@ -142,28 +147,18 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
 
-        // After null check, fullPath is guaranteed non-null
+        string path = fullPath!;
         GeneralOptions options = GeneralOptions.Instance;
 
-        if (IsInternalPath(fullPath) &&
+        if (IsInternalPath(path) &&
             options.ShowInternalFilePaths == ShowInternalFilePathsOption.ShowFileName)
         {
-            return PathFormatter.GetPath(fullPath!, options.DirectorySeparator,
+            return PathFormatter.GetPath(path, options.DirectorySeparator,
                 PathDisplayOption.TrailingPath, 1, options.SpaceAround);
         }
 
-        return PathFormatter.GetPath(fullPath!, options.DirectorySeparator,
+        return PathFormatter.GetPath(path, options.DirectorySeparator,
             options.PathDisplay, options.TrailingPathLevel, options.SpaceAround);
-    }
-
-    private static string TrimPathFromStart(string path, int maxLength)
-    {
-        return PathFormatter.TrimPathFromStart(path, maxLength);
-    }
-
-    private static int CalculateMaxCharacters(double maxWidth)
-    {
-        return PathFormatter.CalculateMaxCharacters(maxWidth);
     }
 
     private void UpdateBottomControlSize()
@@ -197,24 +192,26 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         MenuItem copyFileName = new() { Header = "Copy File Name" };
         copyFileName.Click += (s, e) => CopyToClipboard(GetFileName());
 
-        MenuItem copyProjectRelative = new() { Header = "Copy Project Relative Path" };
-        copyProjectRelative.Click += (s, e) => CopyToClipboard(GetProjectRelativePath());
-
-        MenuItem copySolutionRelative = new() { Header = "Copy Solution Relative Path" };
-        copySolutionRelative.Click += (s, e) => CopyToClipboard(GetSolutionRelativePath());
-
         menu.Items.Add(copyFullPath);
         menu.Items.Add(copyFileName);
-        menu.Items.Add(copyProjectRelative);
-        menu.Items.Add(copySolutionRelative);
 
-        if (_documentMonitor.Namespace != null)
+        if (_documentMonitor.IsInSolutionContext())
         {
-            MenuItem copyNamespace = new() { Header = "Copy Namespace" };
-            copyNamespace.Click += (s, e) => CopyToClipboard(_documentMonitor.Namespace ?? string.Empty);
-            menu.Items.Add(copyNamespace);
-        }
+            MenuItem copyProjectRelative = new() { Header = "Copy Project Relative Path" };
+            copyProjectRelative.Click += (s, e) => CopyToClipboard(GetProjectRelativePath());
 
+            MenuItem copySolutionRelative = new() { Header = "Copy Solution Relative Path" };
+            copySolutionRelative.Click += (s, e) => CopyToClipboard(GetSolutionRelativePath());
+            menu.Items.Add(copyProjectRelative);
+            menu.Items.Add(copySolutionRelative);
+
+            if (_documentMonitor.Namespace != null)
+            {
+                MenuItem copyNamespace = new() { Header = "Copy Namespace" };
+                copyNamespace.Click += (s, e) => CopyToClipboard(_documentMonitor.Namespace ?? string.Empty);
+                menu.Items.Add(copyNamespace);
+            }
+        }
         menu.Items.Add(new Separator());
 
         MenuItem openFolder = new() { Header = "Open Containing Folder" };
@@ -257,7 +254,9 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
 
-        return MakeRelative(fullPath!, _documentMonitor.ProjectDir) ?? fullPath!;
+        string path = fullPath!;
+
+        return MakeRelative(path, _documentMonitor.ProjectDir) ?? path;
     }
 
     private string GetSolutionRelativePath()
@@ -266,7 +265,9 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         if (string.IsNullOrEmpty(fullPath))
             return string.Empty;
 
-        return MakeRelative(fullPath!, _documentMonitor.SolutionDir) ?? fullPath!;
+        string path = fullPath!;
+
+        return MakeRelative(path, _documentMonitor.SolutionDir) ?? path;
     }
 
     private static string? MakeRelative(string fullPath, string? baseDir)
@@ -274,12 +275,13 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
         if (string.IsNullOrEmpty(baseDir))
             return null;
 
-        if (fullPath.StartsWith(baseDir!, StringComparison.OrdinalIgnoreCase))
-            return fullPath.Substring(baseDir!.Length).TrimStart('\\', '/');
+        string root = baseDir!;
+
+        if (fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            return fullPath.Substring(root.Length).TrimStart('\\', '/');
 
         return null;
     }
-
 
     public FrameworkElement VisualElement
     {
@@ -334,7 +336,8 @@ internal class FilePathMargin : Canvas, IWpfTextViewMargin
 
         if (disposing)
         {
-            _documentMonitor?.PropertyChanged -= OnDocumentFileNameChanged;
+            _documentMonitor.PropertyChanged -= OnDocumentFileNameChanged;
+            _lblFilePath.SizeChanged -= OnLabelSizeChanged;
         }
 
         _isDisposed = true;

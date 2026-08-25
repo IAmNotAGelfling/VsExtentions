@@ -14,5 +14,4 @@ namespace FilePathOnDocument.Margin;
 internal sealed class FilePathMarginBottomControlProvider : FilePathMarginProvider
 {
     protected override AlignmentOption Alignment => AlignmentOption.BottomControl;
-    protected override string MarginName => FilePathMargin.MarginName + "BottomControl";
 }

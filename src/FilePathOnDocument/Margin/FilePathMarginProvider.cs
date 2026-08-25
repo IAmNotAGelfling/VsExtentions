@@ -8,7 +8,6 @@ namespace FilePathOnDocument.Margin;
 internal abstract class FilePathMarginProvider : IWpfTextViewMarginProvider
 {
     protected abstract AlignmentOption Alignment { get; }
-    protected abstract string MarginName { get; }
 
     public IWpfTextViewMargin? CreateMargin(IWpfTextViewHost wpfTextViewHost,
         IWpfTextViewMargin marginContainer)

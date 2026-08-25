@@ -12,27 +12,9 @@ namespace FilePathOnDocument.Core;
 
 internal class DocumentMonitor : INotifyPropertyChanged, IDisposable
 {
-    private static readonly Regex CSharpNamespaceRegex = new(@"namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline);
-    private static readonly Regex VbNamespaceRegex = new(@"Namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.IgnoreCase);
-
-    private static readonly Dictionary<string, Regex> NamespaceExtractors = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { ".cs", CSharpNamespaceRegex },
-        { ".fs", CSharpNamespaceRegex },
-        { ".vb", VbNamespaceRegex }
-    };
-
+    private readonly ITextDocument? _document;
     private string? _fileName;
     private bool _isDisposed;
-    private readonly ITextDocument? _document;
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    public string? ProjectDir { get; private set; }
-    public string? ProjectName { get; private set; }
-    public string? SolutionDir { get; private set; }
-    public string? SolutionName { get; private set; }
-    public string? Namespace { get; private set; }
 
     public DocumentMonitor(ITextDocument? document)
     {
@@ -46,23 +28,81 @@ internal class DocumentMonitor : INotifyPropertyChanged, IDisposable
         _document.FileActionOccurred += OnFileActionOccurred;
     }
 
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public string? FileName => _fileName;
+    public string? Namespace { get; private set; }
+    public string? ProjectDir { get; private set; }
+    public string? ProjectName { get; private set; }
+    public string? SolutionDir { get; private set; }
+    public string? SolutionName { get; private set; }
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    public bool IsInSolutionContext()
+    {
+        return ProjectDir != null && SolutionDir != null;
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_isDisposed)
+            return;
+
+        if (disposing)
+        {
+            _document?.FileActionOccurred -= OnFileActionOccurred;
+        }
+
+        _isDisposed = true;
+    }
+
+    protected virtual void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private static readonly Regex CSharpNamespaceRegex = new(@"namespace\s+([\w\.]+)", RegexOptions.Compiled);
+    private static readonly Regex VbNamespaceRegex = new(@"Namespace\s+([\w\.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Dictionary<string, Regex> NamespaceExtractors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { ".cs", CSharpNamespaceRegex },
+        { ".fs", CSharpNamespaceRegex },
+        { ".vb", VbNamespaceRegex }
+    };
+
+    private void ExtractNamespace(string? filePath)
+    {
+        Namespace = null;
+
+        if (string.IsNullOrEmpty(filePath) || _document == null)
+            return;
+
+        string? ext = Path.GetExtension(filePath);
+        if (string.IsNullOrEmpty(ext) || !NamespaceExtractors.TryGetValue(ext, out Regex? regex))
+            return;
+
+        try
+        {
+            string text = _document.TextBuffer.CurrentSnapshot.GetText();
+            Match match = regex.Match(text);
+            if (match.Success)
+                Namespace = match.Groups[1].Value;
+        }
+        catch
+        {
+            // Silent failure
+        }
+    }
+
     private void OnFileActionOccurred(object sender, TextDocumentFileActionEventArgs e)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
         SetFileName(e.FilePath);
-    }
-
-    private void SetFileName(string? filePath)
-    {
-        ThreadHelper.ThrowIfNotOnUIThread();
-
-        if (_fileName == filePath)
-            return;
-
-        _fileName = filePath;
-        ResolveProjectAndSolution(filePath);
-        ExtractNamespace(filePath);
-        OnPropertyChanged(nameof(FileName));
     }
 
     private void ResolveProjectAndSolution(string? filePath)
@@ -100,53 +140,16 @@ internal class DocumentMonitor : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private void ExtractNamespace(string? filePath)
+    private void SetFileName(string? filePath)
     {
-        Namespace = null;
+        ThreadHelper.ThrowIfNotOnUIThread();
 
-        if (string.IsNullOrEmpty(filePath))
+        if (_fileName == filePath)
             return;
 
-        string? ext = Path.GetExtension(filePath);
-        if (string.IsNullOrEmpty(ext) || !NamespaceExtractors.TryGetValue(ext, out Regex? regex))
-            return;
-
-        try
-        {
-            string text = _document!.TextBuffer.CurrentSnapshot.GetText();
-            Match match = regex.Match(text);
-            if (match.Success)
-                Namespace = match.Groups[1].Value;
-        }
-        catch
-        {
-            // Silent failure
-        }
-    }
-
-    public string? FileName => _fileName;
-
-    protected virtual void OnPropertyChanged(string propertyName)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_isDisposed)
-            return;
-
-        if (disposing)
-        {
-            _document?.FileActionOccurred -= OnFileActionOccurred;
-        }
-
-        _isDisposed = true;
+        _fileName = filePath;
+        ResolveProjectAndSolution(filePath);
+        ExtractNamespace(filePath);
+        OnPropertyChanged(nameof(FileName));
     }
 }
